@@ -34,61 +34,16 @@ class ib_class(EWrapper, EClient):
 
     def read_positions(self):
         self.reqPositions()  # associated callback: position
-        logging.info("Waiting for IB's API response for accounts positions requests...\n")
+        logging.info("Waiting for IB's API response for accounts positions requests...")
         time.sleep(3)
         return self.all_positions
 
     def read_navs(self):
         self.reqAccountSummary(0, "All",
                               "NetLiquidation")  # associated callback: accountSummary / Can use "All" up to 50 accounts; after that might need to use specific group name(s) created on TWS workstation
-        logging.info("Waiting for IB's API response for NAVs requests...\n")
+        logging.info("Waiting for IB's API response for NAVs requests...")
         time.sleep(3)
         return self.all_accounts
-
-
-def read_positions():  # read all accounts positions and return DataFrame with information
-    def run_loop():
-        app.run()
-
-    app = ib_class()
-    app.connect('127.0.0.1', 7496, 0)
-    # Start the socket in a thread
-    api_thread = Thread(target=run_loop, daemon=True)
-    api_thread.start()
-    time.sleep(1)  # Sleep interval to allow time for connection to server
-
-    app.reqPositions()  # associated callback: position
-    logging.info("Waiting for IB's API response for accounts positions requests...\n")
-    time.sleep(3)
-    current_positions = app.all_positions
-    current_positions.set_index('Account', inplace=True, drop=True)  # set all_positions DataFrame index to "Account"
-
-    app.disconnect()
-
-    return (current_positions)
-
-
-def read_navs():  # read all accounts NAVs
-
-    def run_loop():
-        app.run()
-
-    app = ib_class()
-    app.connect('127.0.0.1', 7496, 0)
-    # Start the socket in a thread
-    api_thread = Thread(target=run_loop, daemon=True)
-    api_thread.start()
-    time.sleep(1)  # Sleep interval to allow time for connection to server
-
-    app.reqAccountSummary(0, "All",
-                          "NetLiquidation")  # associated callback: accountSummary / Can use "All" up to 50 accounts; after that might need to use specific group name(s) created on TWS workstation
-    logging.info("Waiting for IB's API response for NAVs requests...\n")
-    time.sleep(3)
-    current_nav = app.all_accounts
-
-    app.disconnect()
-
-    return (current_nav)
 
 
 def setup():
