@@ -92,7 +92,7 @@ if __name__ == '__main__':
 
     portfolio_returns = calc_returns(portfolio_prices)
     portfolio_sd_move = calc_sd_move(portfolio_returns)
-    portfolio_sd_move.to_excel(OUTPUT_PATH)
+    portfolio_sd_move.to_excel(RETURNS_OUTPUT_PATH)
 
     # TODO: Add logger
     # TODO: Format Excel for better viewing?

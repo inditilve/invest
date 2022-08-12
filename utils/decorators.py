@@ -1,7 +1,6 @@
 import time
 from functools import wraps
-from utils.logutils import init_log
-logger = init_log(__name__)
+import logging
 
 
 def retry(exceptions, total_tries=4, initial_wait=0.25, backoff_factor=2):
@@ -19,7 +18,7 @@ def retry(exceptions, total_tries=4, initial_wait=0.25, backoff_factor=2):
             _tries, _delay = total_tries + 1, initial_wait
             while _tries > 1:
                 try:
-                    logger.info(f'{total_tries + 2 - _tries}. try:')
+                    logging.info(f'{total_tries + 2 - _tries}. try:')
                     return f(*args, **kwargs)
                 except exceptions as e:
                     _tries -= 1
@@ -28,7 +27,7 @@ def retry(exceptions, total_tries=4, initial_wait=0.25, backoff_factor=2):
                         msg = str(f'Function: {f.__name__}\n'
                                   f'Failed despite best efforts after {total_tries} tries.\n'
                                   f'args: {print_args}, kwargs: {kwargs}')
-                        logger.error(msg)
+                        logging.error(msg)
                         raise
                     time.sleep(_delay)
                     _delay *= backoff_factor
