@@ -1,6 +1,5 @@
 import logging
 import time
-import uuid
 from dataclasses import dataclass
 from threading import Thread
 
@@ -8,33 +7,47 @@ import pandas as pd
 from ibapi.client import EClient
 from ibapi.common import TickerId, TickAttrib
 from ibapi.contract import Contract
-from ibapi.ticktype import TickType
+from ibapi.ticktype import TickType, TickTypeEnum
 from ibapi.wrapper import EWrapper
 
 from resources.STATIC_DATA import STATIC_IP, IB_PORT
 
 logging.basicConfig(level=logging.INFO)
-logging.getLogger("ibapi").setLevel(logging.WARNING)
+logging.getLogger("ibapi").setLevel(logging.WARN)
 
 
-@dataclass
-class PositionRow:
-    """
-        Class for position attributes
-    """
-    symbol: str
-    position: float
-    avg_cost: float
-    sec_type: str
-    contract: Contract
+# class CanUpdate:
+#     def update(self, new):
+#         for key, value in new.items():
+#             if hasattr(self, key):
+#                 setattr(self, key, value)
+#
+#
+# @dataclass
+# class PositionRow(CanUpdate):
+#     """
+#         Class for position attributes
+#     """
+#     symbol: str
+#     position: float
+#     avg_cost: float
+#     sec_type: str
+#     contract: Contract
+#     bid: float = 0.0
+#     ask: float = 0.0
+#
+#     def market_price(self):
+#         return (self.bid + self.ask) / 2
+#
+#     def market_value(self):
+#         return self.position * self.market_price()
 
 
 class InteractiveBrokersApi(EWrapper, EClient):
     def __init__(self):
         EClient.__init__(self, self)
 
-        self.all_positions = pd.DataFrame([], columns=['Account', 'Symbol', 'Position', 'Average Cost', 'Sec Type',
-                                                       'Contract'])
+        self.all_positions = pd.DataFrame([])
         # TODO: MV, Last, PnL=Unrealized+Realized+Fees+Income+Interest,
         # TODO: Country,Exchange,Desc,Ticker/BBG/RIC/Ident, Industry, Type, Region?
 
@@ -49,7 +62,6 @@ class InteractiveBrokersApi(EWrapper, EClient):
     def error(self, reqId: TickerId, errorCode: int, errorString: str):
         if reqId > -1:
             logging.error("Error. Id: ", reqId, " Code: ", errorCode, " Msg: ", errorString)
-            raise
 
     """
         START - Callback handlers
@@ -58,20 +70,27 @@ class InteractiveBrokersApi(EWrapper, EClient):
     def position(self, account: str, contract: Contract, position: float,
                  avgCost: float):
         super().position(account, contract, position, avgCost)
-        index = str(contract.symbol)
-        position_df = pd.DataFrame([PositionRow(symbol=contract.symbol,
-                                                position=position,
-                                                avg_cost=avgCost,
-                                                sec_type=contract.secType,
-                                                contract=contract)])
-        self.all_positions = pd.concat([self.all_positions, position_df])
-        # self.all_positions.loc[index] = account, contract.symbol, position, avgCost, contract.secType, contract
+        data = {
+            "symbol": [contract.symbol],
+            "position": [position],
+            "avg_cost": [avgCost],
+            "sec_type": [contract.secType],
+            "contract": [contract]
+        }
+        position_df = pd.DataFrame(data)
+        self.all_positions = pd.concat([self.all_positions, position_df], ignore_index=True)
 
     def accountSummary(self, reqId: int, account: str, tag: str, value: str,
                        currency: str):
         super().accountSummary(reqId, account, tag, value, currency)
-        index = str(account)
-        self.all_accounts.loc[index] = reqId, account, tag, value, currency
+        data = {
+            "reqId": [reqId],
+            "account": [account],
+            "tag": [tag],
+            "value": [value],
+            "currency": [currency]
+        }
+        self.all_accounts = pd.DataFrame(data)
 
     def pnl(self, reqId: int, dailyPnL: float, unrealizedPnL: float, realizedPnL: float):
         super().pnl(reqId, dailyPnL, unrealizedPnL, realizedPnL)
@@ -80,7 +99,16 @@ class InteractiveBrokersApi(EWrapper, EClient):
     def tickPrice(self, reqId: TickerId, tickType: TickType, price: float,
                   attrib: TickAttrib):
         super().tickPrice(reqId, tickType, price, attrib)
-        pass
+        logging.info(f"Reached callback: reqId: {reqId}, tickType: {tickType}, price: {price}, attrib: {attrib}")
+        if tickType == TickTypeEnum.DELAYED_BID:
+            self.all_positions.loc[[reqId], ["Bid"]] = price
+            logging.info("----------------------------GOT BID - Printing all positions")
+            logging.info(self.all_positions)
+        if tickType == TickTypeEnum.DELAYED_ASK:
+            logging.info("-----------------------------GOT ASK - Printing all positions")
+            self.all_positions.loc[[reqId], ["Ask"]] = price
+
+        # super().cancelMktData(reqId)
 
     """
         END - Callback handlers
@@ -96,13 +124,15 @@ class InteractiveBrokersApi(EWrapper, EClient):
         logging.info("Waiting for IB's API response for reqPositions requests...")
         time.sleep(3)
 
-        def req_market_data_with_delay(contract, delay=3):
+        def req_market_data_with_delay(index, contract, delay=3):
             # associated callbacks: tickPrice, tickSize
-            self.reqMktData(uuid.uuid4().int & (1 << 64) - 1, contract, '', False, False, [])
+            self.reqMarketDataType(4)
+            self.reqMktData(index, contract, "", False, False, [])
             logging.info(f"Waiting for IB's API response for {contract.symbol} reqMktData requests ...")
             time.sleep(delay)
 
-        [req_market_data_with_delay(contract) for contract in self.all_positions['contract']]
+        [req_market_data_with_delay(i, contract) for i, contract in
+         enumerate(self.all_positions['contract'].tolist())]
 
         return self.all_positions
 
