@@ -148,11 +148,7 @@ if __name__ == '__main__':
     # Objective: Monthly investment amount to be allocated into signals based on portfolio goal
     app = setup()
 
-    # TODO: Positions - get PnL columns
-    # TODO: Positions - get listing country / exchange info
     # TODO: Send to fetch_returns accordingly to grab prices / returns
-    # TODO: Last Price, Fees+Income+Interest,
-    # TODO: Country,Exchange,Desc,Ticker/BBG/RIC/Ident, Industry, Type, Region?
     # TODO: Instrument classifiers (coupled with DB concern)
 
     # TODO: Plug-in current portfolio into inception date and calculate return until date
