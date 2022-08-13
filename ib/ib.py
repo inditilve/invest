@@ -5,7 +5,7 @@ from threading import Thread
 import pandas as pd
 from ibapi.client import EClient
 from ibapi.common import TickerId
-from ibapi.contract import Contract
+from ibapi.contract import Contract, ContractDetails
 from ibapi.wrapper import EWrapper
 
 from resources.STATIC_DATA import STATIC_IP, IB_PORT, IB_ACCOUNT_NAME, IB_DATA_OUTPUT_PATH
@@ -19,8 +19,6 @@ class InteractiveBrokersApi(EWrapper, EClient):
         EClient.__init__(self, self)
 
         self.all_positions = pd.DataFrame([])
-        # TODO: Last, Fees+Income+Interest,
-        # TODO: Country,Exchange,Desc,Ticker/BBG/RIC/Ident, Industry, Type, Region?
 
         """
             Doc for PnL columns: 
@@ -46,6 +44,7 @@ class InteractiveBrokersApi(EWrapper, EClient):
             "position": [position],
             "avg_cost": [avgCost],
             "sec_type": [contract.secType],
+            "currency": [contract.currency],
             "contract": [contract]
         }
         position_df = pd.DataFrame(data)
@@ -65,8 +64,26 @@ class InteractiveBrokersApi(EWrapper, EClient):
 
     def pnlSingle(self, reqId: int, pos: int, dailyPnL: float, unrealizedPnL: float, realizedPnL: float, value: float):
         super().pnlSingle(reqId, pos, dailyPnL, unrealizedPnL, realizedPnL, value)
-        self.all_positions.loc[[reqId], ["daily_pnl", "unrealized_pnl", "realized_pnl", "market_value"]] = \
+        self.all_positions.loc[self.all_positions['index'] == reqId,
+                               ["daily_pnl",
+                                "unrealized_pnl",
+                                "realized_pnl",
+                                "market_value"]] = \
             [dailyPnL, unrealizedPnL, realizedPnL, value]
+
+    def contractDetails(self, reqId: int, contractDetails: ContractDetails):
+        super().contractDetails(reqId, contractDetails)
+        self.all_positions.loc[self.all_positions['index'] == reqId,
+                               ["long_name",
+                                "industry",
+                                "category",
+                                "sub_category",
+                                "stock_type"]] = \
+            [contractDetails.longName,
+             contractDetails.industry,
+             contractDetails.category,
+             contractDetails.subcategory,
+             contractDetails.stockType]
 
     """
         END - Callback handlers
@@ -81,14 +98,9 @@ class InteractiveBrokersApi(EWrapper, EClient):
         self.reqPositions()
         logging.info("Waiting for IB's API response for reqPositions requests...")
         time.sleep(3)
+        self.all_positions.reset_index(level=0, inplace=True)
 
-        def req_pnl_for_position(index, contract: Contract, delay=2):
-            # associated callbacks: pnlSingle
-            self.reqPnLSingle(index, IB_ACCOUNT_NAME, "", contract.conId)
-            logging.info(f"Waiting for IB's API response for {contract.symbol} reqPnLSingle requests ...")
-            time.sleep(delay)
-
-        [req_pnl_for_position(i, contract) for i, contract in
+        [self.enrich(i, contract) for i, contract in
          enumerate(self.all_positions['contract'].tolist())]
 
         return self.all_positions
@@ -101,8 +113,21 @@ class InteractiveBrokersApi(EWrapper, EClient):
         time.sleep(3)
         return self.all_accounts
 
-    def enrich(self):
-        pass
+    def enrich(self, index: int, contract: Contract):
+        def req_pnl_for_position(_index, _contract: Contract, _delay=1):
+            # associated callbacks: pnlSingle
+            self.reqPnLSingle(_index, IB_ACCOUNT_NAME, "", _contract.conId)
+            logging.info(f"Waiting for IB's API response for {_contract.symbol} reqPnLSingle requests ...")
+            time.sleep(_delay)
+
+        def req_contract_details(_index: int, _contract: Contract, _delay: int = 2):
+            # associated callbacks: contractDetails, contractDetailsEnd
+            self.reqContractDetails(_index, _contract)
+            logging.info(f"Waiting for IB's API response for {_contract.symbol} reqContractDetails requests ...")
+            time.sleep(_delay)
+
+        req_pnl_for_position(index, contract)
+        req_contract_details(index, contract)
 
     """
         END - Synchronous API wrappers
@@ -126,7 +151,8 @@ if __name__ == '__main__':
     # TODO: Positions - get PnL columns
     # TODO: Positions - get listing country / exchange info
     # TODO: Send to fetch_returns accordingly to grab prices / returns
-
+    # TODO: Last Price, Fees+Income+Interest,
+    # TODO: Country,Exchange,Desc,Ticker/BBG/RIC/Ident, Industry, Type, Region?
     # TODO: Instrument classifiers (coupled with DB concern)
 
     # TODO: Plug-in current portfolio into inception date and calculate return until date

@@ -1,2 +1,2 @@
 # invest
-    Objective: Monthly investment amount to be allocated into signals based on portfolio goal
+    Objective: Generate signal based on monthly investment amount and desired portfolio composition(weights)
