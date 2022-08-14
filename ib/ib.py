@@ -58,6 +58,7 @@ class InteractiveBrokersApi(EWrapper, EClient):
             "avg_cost": [avgCost],
             "sec_type": [contract.secType],
             "currency": [contract.currency],
+            "exchange": [contract.exchange],
             "contract": [contract]
         }
         position_df = pd.DataFrame(data)
@@ -100,6 +101,8 @@ class InteractiveBrokersApi(EWrapper, EClient):
 
     def get_positions(self):
         # associated callback: position
+        if not self.isConnected():
+            raise ConnectionError("Not connected to IB API")
         self.reqPositions()
         logging.info("Waiting for IB's API response for reqPositions requests...")
         time.sleep(3)
@@ -111,6 +114,8 @@ class InteractiveBrokersApi(EWrapper, EClient):
         return self.all_positions
 
     def get_account_data(self):
+        if not self.isConnected():
+            raise ConnectionError("Not connected to IB API")
         # associated callback: accountSummary
         self.reqAccountSummary(0, "All", "NetLiquidation,TotalCashValue,AccruedCash,BuyingPower,InitMarginReq,"
                                          "MaintMarginReq,AvailableFunds,ExcessLiquidity,GrossPositionValue,Leverage")
@@ -120,12 +125,16 @@ class InteractiveBrokersApi(EWrapper, EClient):
 
     def get_pnl_for_position(self, _index: int, _contract: Contract, _delay=1):
         # associated callbacks: pnlSingle
+        if not self.isConnected():
+            raise ConnectionError("Not connected to IB API")
         self.reqPnLSingle(_index, IB_ACCOUNT_NAME, "", _contract.conId)
         logging.info(f"Waiting for IB's API response for {_contract.symbol} reqPnLSingle requests ...")
         time.sleep(_delay)
 
     def get_contract_details(self, _index: int, _contract: Contract, _delay: int = 2):
         # associated callbacks: contractDetails, contractDetailsEnd
+        if not self.isConnected():
+            raise ConnectionError("Not connected to IB API")
         self.reqContractDetails(_index, _contract)
         logging.info(f"Waiting for IB's API response for {_contract.symbol} reqContractDetails requests ...")
         time.sleep(_delay)
