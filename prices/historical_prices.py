@@ -43,7 +43,7 @@ def fetch_hk_close_prices_quandl(tickers: list):
     return data
 
 
-def calc_returns(df: pd.DataFrame):
+def calc_historical_log_returns(df: pd.DataFrame):
     """
     Calculates natural log returns for provided DataFrame of close prices
     Parameters -
@@ -63,7 +63,7 @@ def calc_returns(df: pd.DataFrame):
     return returns
 
 
-def calc_sd_move(returns: pd.DataFrame):
+def tag_sd_moves(returns: pd.DataFrame):
 
     sd_move = returns.copy()
     
