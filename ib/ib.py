@@ -8,7 +8,7 @@ from ibapi.common import TickerId
 from ibapi.contract import Contract, ContractDetails
 from ibapi.wrapper import EWrapper
 
-from resources.STATIC_DATA import STATIC_IP, IB_PORT, IB_ACCOUNT_NAME, IB_DATA_OUTPUT_PATH
+from resources.STATIC_DATA import STATIC_IP, IB_PORT, IB_ACCOUNT_NAME
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("ibapi").setLevel(logging.WARN)
@@ -86,15 +86,9 @@ class InteractiveBrokersApi(EWrapper, EClient):
         super().contractDetails(reqId, contractDetails)
         self.all_positions.loc[self.all_positions['index'] == reqId,
                                ["long_name",
-                                "industry",
-                                "category",
-                                "sub_category",
-                                "stock_type"]] = \
+                                "marketName"]] = \
             [contractDetails.longName,
-             contractDetails.industry,
-             contractDetails.category,
-             contractDetails.subcategory,
-             contractDetails.stockType]
+             contractDetails.marketName]
 
     """
         END - Callback handlers
@@ -111,7 +105,7 @@ class InteractiveBrokersApi(EWrapper, EClient):
         time.sleep(3)
         self.all_positions.reset_index(level=0, inplace=True)
 
-        [self.enrich(i, contract) for i, contract in
+        [self.get_pnl_for_position(i, contract) for i, contract in
          enumerate(self.all_positions['contract'].tolist())]
 
         return self.all_positions
@@ -124,55 +118,18 @@ class InteractiveBrokersApi(EWrapper, EClient):
         time.sleep(5)
         return self.all_accounts
 
-    def enrich(self, index: int, contract: Contract):
-        def req_pnl_for_position(_index, _contract: Contract, _delay=1):
-            # associated callbacks: pnlSingle
-            self.reqPnLSingle(_index, IB_ACCOUNT_NAME, "", _contract.conId)
-            logging.info(f"Waiting for IB's API response for {_contract.symbol} reqPnLSingle requests ...")
-            time.sleep(_delay)
+    def get_pnl_for_position(self, _index: int, _contract: Contract, _delay=1):
+        # associated callbacks: pnlSingle
+        self.reqPnLSingle(_index, IB_ACCOUNT_NAME, "", _contract.conId)
+        logging.info(f"Waiting for IB's API response for {_contract.symbol} reqPnLSingle requests ...")
+        time.sleep(_delay)
 
-        def req_contract_details(_index: int, _contract: Contract, _delay: int = 2):
-            # associated callbacks: contractDetails, contractDetailsEnd
-            self.reqContractDetails(_index, _contract)
-            logging.info(f"Waiting for IB's API response for {_contract.symbol} reqContractDetails requests ...")
-            time.sleep(_delay)
-
-        req_pnl_for_position(index, contract)
-        # req_contract_details(index, contract)
+    def get_contract_details(self, _index: int, _contract: Contract, _delay: int = 2):
+        # associated callbacks: contractDetails, contractDetailsEnd
+        self.reqContractDetails(_index, _contract)
+        logging.info(f"Waiting for IB's API response for {_contract.symbol} reqContractDetails requests ...")
+        time.sleep(_delay)
 
     """
         END - Synchronous API wrappers
     """
-
-
-def setup():
-    app = InteractiveBrokersApi()
-    app.connect(STATIC_IP, IB_PORT, 0)
-    # Start the socket in a thread
-    api_thread = Thread(target=app.run, daemon=True)
-    api_thread.start()
-    time.sleep(1)  # Sleep interval to allow time for connection to server
-    return app
-
-
-if __name__ == '__main__':
-    # Objective: Monthly investment amount to be allocated into signals based on portfolio goal
-    # app = setup()
-
-    # TODO: Send to fetch_returns accordingly to grab prices / returns
-    # TODO: Instrument classifiers (coupled with DB concern)
-
-    # TODO: Plug-in current portfolio into inception date and calculate return until date
-    # TODO: Plug-in NetLiq into S&P inception date and calculate return until date
-    # TODO: Plug-in current portfolio MINUS single names and calculate return until date
-
-    with InteractiveBrokersApi() as app:
-        all_positions = app.get_positions()
-        logging.info(all_positions)
-        all_navs = app.get_account_data()
-        logging.info(all_navs)
-
-        with pd.ExcelWriter(IB_DATA_OUTPUT_PATH) as writer:
-            all_positions.to_excel(writer, sheet_name="Position", index=False)
-            all_navs.to_excel(writer, sheet_name="Account", index=False)
-    # app.disconnect()
