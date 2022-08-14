@@ -3,7 +3,8 @@ import yfinance as yf
 import quandl
 import pandas as pd
 from functools import reduce
-from resources.STATIC_DATA import *
+
+from resources.STATIC_DATA import QUANDL_API_KEY, US_TICKERS, LN_TICKERS, HK_TICKERS, RETURNS_OUTPUT_PATH
 
 
 def yahoo_fetch(tickers):

@@ -15,6 +15,19 @@ logging.getLogger("ibapi").setLevel(logging.WARN)
 
 
 class InteractiveBrokersApi(EWrapper, EClient):
+
+    def __enter__(self):
+        self.__init__()
+        self.connect(STATIC_IP, IB_PORT, 0)
+        # Start the socket in a thread
+        api_thread = Thread(target=self.run, daemon=True)
+        api_thread.start()
+        time.sleep(1)  # Sleep interval to allow time for connection to server
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.disconnect()
+
     def __init__(self):
         EClient.__init__(self, self)
 
@@ -54,22 +67,20 @@ class InteractiveBrokersApi(EWrapper, EClient):
                        currency: str):
         super().accountSummary(reqId, account, tag, value, currency)
         data = {
-            "reqId": [reqId],
-            "account": [account],
             "tag": [tag],
             "value": [value],
             "currency": [currency]
         }
-        self.all_accounts = pd.DataFrame(data)
+        account_data_df = pd.DataFrame(data)
+        self.all_accounts = pd.concat([self.all_accounts, account_data_df], ignore_index=True)
 
     def pnlSingle(self, reqId: int, pos: int, dailyPnL: float, unrealizedPnL: float, realizedPnL: float, value: float):
         super().pnlSingle(reqId, pos, dailyPnL, unrealizedPnL, realizedPnL, value)
         self.all_positions.loc[self.all_positions['index'] == reqId,
                                ["daily_pnl",
                                 "unrealized_pnl",
-                                "realized_pnl",
                                 "market_value"]] = \
-            [dailyPnL, unrealizedPnL, realizedPnL, value]
+            [dailyPnL, unrealizedPnL, value]
 
     def contractDetails(self, reqId: int, contractDetails: ContractDetails):
         super().contractDetails(reqId, contractDetails)
@@ -106,11 +117,11 @@ class InteractiveBrokersApi(EWrapper, EClient):
         return self.all_positions
 
     def get_account_data(self):
-        self.reqAccountSummary(0, "All",
-                               "NetLiquidation")  # associated callback: accountSummary / Can use "All" up to 50
-        # accounts; after that might need to use specific group name(s) created on TWS workstation
+        # associated callback: accountSummary
+        self.reqAccountSummary(0, "All", "NetLiquidation,TotalCashValue,AccruedCash,BuyingPower,InitMarginReq,"
+                                         "MaintMarginReq,AvailableFunds,ExcessLiquidity,GrossPositionValue,Leverage")
         logging.info("Waiting for IB's API response for reqAccountSummary requests...")
-        time.sleep(3)
+        time.sleep(5)
         return self.all_accounts
 
     def enrich(self, index: int, contract: Contract):
@@ -127,7 +138,7 @@ class InteractiveBrokersApi(EWrapper, EClient):
             time.sleep(_delay)
 
         req_pnl_for_position(index, contract)
-        req_contract_details(index, contract)
+        # req_contract_details(index, contract)
 
     """
         END - Synchronous API wrappers
@@ -146,7 +157,7 @@ def setup():
 
 if __name__ == '__main__':
     # Objective: Monthly investment amount to be allocated into signals based on portfolio goal
-    app = setup()
+    # app = setup()
 
     # TODO: Send to fetch_returns accordingly to grab prices / returns
     # TODO: Instrument classifiers (coupled with DB concern)
@@ -155,12 +166,13 @@ if __name__ == '__main__':
     # TODO: Plug-in NetLiq into S&P inception date and calculate return until date
     # TODO: Plug-in current portfolio MINUS single names and calculate return until date
 
-    all_positions = app.get_positions()
-    logging.info(all_positions)
-    all_navs = app.get_account_data()
-    logging.info(all_navs)
+    with InteractiveBrokersApi() as app:
+        all_positions = app.get_positions()
+        logging.info(all_positions)
+        all_navs = app.get_account_data()
+        logging.info(all_navs)
 
-    with pd.ExcelWriter(IB_DATA_OUTPUT_PATH) as writer:
-        all_positions.to_excel(writer, sheet_name="Position", index=False)
-        all_navs.to_excel(writer, sheet_name="Account", index=False)
-    app.disconnect()
+        with pd.ExcelWriter(IB_DATA_OUTPUT_PATH) as writer:
+            all_positions.to_excel(writer, sheet_name="Position", index=False)
+            all_navs.to_excel(writer, sheet_name="Account", index=False)
+    # app.disconnect()
