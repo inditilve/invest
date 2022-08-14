@@ -1,12 +1,12 @@
 import numpy as np
-import yfinance as yf
-import quandl
 import pandas as pd
-from functools import reduce
-from resources.STATIC_DATA import *
+import quandl
+import yfinance as yf
+
+from resources.STATIC_DATA import QUANDL_API_KEY
 
 
-def yahoo_fetch(tickers):
+def fetch_close_prices_yfinance(tickers: list):
     """
     Fetches close prices for provided list of tickers from Yahoo Finance.
     Parameters -
@@ -23,7 +23,7 @@ def yahoo_fetch(tickers):
     return data
 
 
-def quandl_fetch(tickers):
+def fetch_hk_close_prices_quandl(tickers: list):
     """
     Fetches close prices for provided list of tickers from Quandl.
     Parameters -
@@ -43,7 +43,7 @@ def quandl_fetch(tickers):
     return data
 
 
-def calc_returns(df):
+def calc_historical_log_returns(df: pd.DataFrame):
     """
     Calculates natural log returns for provided DataFrame of close prices
     Parameters -
@@ -63,7 +63,7 @@ def calc_returns(df):
     return returns
 
 
-def calc_sd_move(returns):
+def tag_sd_moves(returns: pd.DataFrame):
 
     sd_move = returns.copy()
     
@@ -76,23 +76,3 @@ def calc_sd_move(returns):
         sd_move.loc[returns[ticker] >= (mean + sd), ticker+'_move'] = '1 SD JUMP'
         sd_move.loc[returns[ticker] >= (mean + (2 * sd)), ticker+'_move'] = '2 SD JUMP'
     return sd_move
-
-
-if __name__ == '__main__':
-    # TODO: Figure out whether to fetch adj or unadj close prices???
-    #  HK Quandls prices unknown whether adjusted or not,
-    #  Yahoo prices are UN-adjusted (we specifically pick close and not adj close in the code below)
-
-    prices_list = [yahoo_fetch(US_TICKERS + LN_TICKERS), quandl_fetch(HK_TICKERS)]
-
-    portfolio_prices = reduce(lambda left, right:
-                              pd.merge(left, right, left_index=True, right_index=True,
-                                       how='outer'), prices_list)
-    portfolio_prices.sort_index(axis=1, inplace=True)
-
-    portfolio_returns = calc_returns(portfolio_prices)
-    portfolio_sd_move = calc_sd_move(portfolio_returns)
-    portfolio_sd_move.to_excel(OUTPUT_PATH)
-
-    # TODO: Add logger
-    # TODO: Format Excel for better viewing?

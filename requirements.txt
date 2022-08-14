@@ -1,0 +1,6 @@
+ibapi
+numpy
+pandas
+quandl
+yfinance
+openpyxl
