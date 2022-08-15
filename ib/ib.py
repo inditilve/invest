@@ -23,6 +23,8 @@ class InteractiveBrokersApi(EWrapper, EClient):
         api_thread = Thread(target=self.run, daemon=True)
         api_thread.start()
         time.sleep(1)  # Sleep interval to allow time for connection to server
+        if not self.isConnected():
+            raise ConnectionError("Not connected to IB API. TWS may not be running.") 
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -102,7 +104,7 @@ class InteractiveBrokersApi(EWrapper, EClient):
     def get_positions(self):
         # associated callback: position
         if not self.isConnected():
-            raise ConnectionError("Not connected to IB API")
+            raise ConnectionError("Not connected to IB API. TWS may not be running.")
         self.reqPositions()
         logging.info("Waiting for IB's API response for reqPositions requests...")
         time.sleep(3)
@@ -115,7 +117,7 @@ class InteractiveBrokersApi(EWrapper, EClient):
 
     def get_account_data(self):
         if not self.isConnected():
-            raise ConnectionError("Not connected to IB API")
+            raise ConnectionError("Not connected to IB API. TWS may not be running.")
         # associated callback: accountSummary
         self.reqAccountSummary(0, "All", "NetLiquidation,TotalCashValue,AccruedCash,BuyingPower,InitMarginReq,"
                                          "MaintMarginReq,AvailableFunds,ExcessLiquidity,GrossPositionValue,Leverage")
@@ -126,7 +128,7 @@ class InteractiveBrokersApi(EWrapper, EClient):
     def get_pnl_for_position(self, _index: int, _contract: Contract, _delay=1):
         # associated callbacks: pnlSingle
         if not self.isConnected():
-            raise ConnectionError("Not connected to IB API")
+            raise ConnectionError("Not connected to IB API. TWS may not be running.")
         self.reqPnLSingle(_index, IB_ACCOUNT_NAME, "", _contract.conId)
         logging.info(f"Waiting for IB's API response for {_contract.symbol} reqPnLSingle requests ...")
         time.sleep(_delay)
@@ -134,7 +136,7 @@ class InteractiveBrokersApi(EWrapper, EClient):
     def get_contract_details(self, _index: int, _contract: Contract, _delay: int = 2):
         # associated callbacks: contractDetails, contractDetailsEnd
         if not self.isConnected():
-            raise ConnectionError("Not connected to IB API")
+            raise ConnectionError("Not connected to IB API. TWS may not be running.")
         self.reqContractDetails(_index, _contract)
         logging.info(f"Waiting for IB's API response for {_contract.symbol} reqContractDetails requests ...")
         time.sleep(_delay)
