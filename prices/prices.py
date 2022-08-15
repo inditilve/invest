@@ -6,7 +6,7 @@ import yfinance as yf
 from resources.STATIC_DATA import QUANDL_API_KEY
 
 
-def fetch_latest_fx_yfinance(currency_list: list[str]) -> pd.DataFrame:
+def fetch_last_close_spot_yfinance(currency_list: list[str]) -> pd.DataFrame:
     fx_df = pd.DataFrame({'ticker': [f'{currency}USD=X' for currency in currency_list],
                           'currency': [currency for currency in currency_list]})
     tickers = fx_df['ticker'].tolist()
@@ -28,7 +28,7 @@ def fetch_latest_fx_yfinance(currency_list: list[str]) -> pd.DataFrame:
     return data
 
 
-def fetch_close_prices_yfinance(tickers: list[str]) -> pd.DataFrame:
+def fetch_all_close_prices_yfinance(tickers: list[str]) -> pd.DataFrame:
     """
     Fetches close prices for provided list of tickers from Yahoo Finance.
     Parameters -
